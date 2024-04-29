@@ -1,3 +1,5 @@
+This fork will be to better help me sort out changes that I've made to VMC to make it work with my sim racing equipment, and include integrations with iRacing
+
 # バーチャルモーションキャプチャー (VirtualMotionCapture)  
 VRゲーム中にモデルをコントロール  
   
