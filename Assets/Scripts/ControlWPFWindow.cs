@@ -1504,8 +1504,8 @@ namespace VMC
             externalMotionSender.externalReceiver = externalMotionReceivers.FirstOrDefault();
             easyDeviceDiscoveryProtocolManager.externalReceiver = externalMotionSender.externalReceiver;
             receiver.SetSetting(setting);
-            receiver.SetObjectActive(setting.Enable);
             receiver.ChangeOSCPort(setting.Port);
+            receiver.SetObjectActive(setting.Enable);
         }
 
         private void RemoveVMCProtocolReceiver(int index)
@@ -1605,7 +1605,11 @@ namespace VMC
             }
 
             //通知レベルがLog以外の時かつ、Warning以下かつ、*から始まらないものはうるさいので飛ばさない
-            if (notifyLogLevel != NotifyLogTypes.Log && notifyLogLevel <= notifyType && !cond.StartsWith("*"))
+            if (cond.StartsWith("*"))
+            {
+                cond = cond.Substring(1);
+            }
+            else if (notifyLogLevel != NotifyLogTypes.Log && notifyLogLevel <= notifyType)
             {
                 return;
             }

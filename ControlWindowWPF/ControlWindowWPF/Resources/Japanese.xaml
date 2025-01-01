@@ -27,7 +27,7 @@
     <!-- MainWindow -->
     <system:String x:Key="MainWindowTitle">コントロールパネル</system:String>
     <system:String x:Key="MainWindowTitleLoading">起動中</system:String>
-    <system:String x:Key="MainWindowOpenVRAlertStatus">⚠ VR内でメニューを開いている間は、位置や操作が正常に取得できません。閉じてください。</system:String>
+    <system:String x:Key="MainWindowOpenVRAlertStatus">⚠ VR内でメニューやキーボードを開いている間は、位置や操作が正常に取得できません。閉じてください。</system:String>
 
 	<system:String x:Key="MainWindow_Setting">設定</system:String>
     <system:String x:Key="MainWindow_LoadSetting">設定の読込</system:String>
@@ -148,6 +148,7 @@
     <system:String x:Key="CalibrationWindow_Status_CalibrateTposeRadioButton">Tポーズ(手の高さやスケールを微調整したい場合はこちら)</system:String>
     <system:String x:Key="CalibrationWindow_Status_CalibrateFixedHandRadioButton">MR合成モード(手の位置をなるべく合わせて足は真っ直ぐ伸ばす)</system:String>
     <system:String x:Key="CalibrationWindow_Status_CalibrateFixedHandWithGroundRadioButton">MR合成モード(手の位置をなるべく合わせて足は地面に合わせて曲げる)</system:String>
+    <system:String x:Key="CalibrationWindow_Status_CalibrateDefaultRadioButton">通常モード</system:String>
     <system:String x:Key="CalibrationWindow_Status_CalibrationInformation" xml:space="preserve">Iポーズキャリブレーションがうまくいかない場合はルームスケールを再設定して床の高さを正しくしてください。&#xa;Tポーズの場合は腕を少し短くなるように曲げたり、腕を少し上げると調整が出来ます。&#xa;画面に表示される白玉はトラッカーが認識されているか確認するための表示です。位置を合わせる必要はありません。</system:String>
     <system:String x:Key="CalibrationWindow_FinishSound">完了音</system:String>
 
@@ -305,6 +306,7 @@
     <system:String x:Key="TrackerConfigWindow_RightElbow">右ひじ</system:String>
     <system:String x:Key="TrackerConfigWindow_LeftKnee">左ひざ</system:String>
     <system:String x:Key="TrackerConfigWindow_RightKnee">右ひざ</system:String>
+    <system:String x:Key="TrackerConfigWindow_Chest">胸</system:String>
     <system:String x:Key="TrackerConfigWindow_TrackersList">トラッカー一覧(移動したトラッカーに色が付きます)</system:String>
     <system:String x:Key="TrackerConfigWindow_TrackerOffset">手のトラッカーオフセット設定(トラッカーの底面のネジ穴から手首の関節中心までの距離を設定)</system:String>
     <system:String x:Key="TrackerConfigWindow_OffsetLeftHand">左手</system:String>
@@ -555,7 +557,7 @@
 	<system:String x:Key="CalibrationResultWindow_CalibrationSucceed">キャリブレーションが完了しました</system:String>
 	<system:String x:Key="CalibrationResultWindow_CalibrationFailed">キャリブレーションに失敗しました</system:String>
 	<system:String x:Key="CalibrationResultWindow_BodyParamMessage">あなたの身体パラメータを推定しました。</system:String>
-	<system:String x:Key="CalibrationResultWindow_PleaseCheckDevicesMessage">デバイスの認識や割り当て設定を確認してください</system:String>
+	<system:String x:Key="CalibrationResultWindow_PleaseCheckDevicesMessage" xml:space="preserve">VRデバイス等の認識や割り当て設定を確認してください。&#xa;なお、mocopiのみお使いの場合、キャリブレーションの必要はありません。</system:String>
 	<system:String x:Key="CalibrationResultWindow_RealHeight">身長</system:String>
 	<system:String x:Key="CalibrationResultWindow_CautionMessage">実際の値と大きく違う場合、装着位置や床の高さ設定を確認し、正しい姿勢でもう一度キャリブレーションを実行してください。</system:String>
 	<system:String x:Key="CalibrationResultWindow_AutoCloseTimerMessage">秒後に自動で閉じます</system:String>

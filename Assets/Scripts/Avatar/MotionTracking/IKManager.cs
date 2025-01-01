@@ -45,6 +45,7 @@ namespace VMC
 
         private Animator animator => virtualAvatar?.animator;
 
+        private SortedDictionary<int, List<(Guid eventId, Action action)>> OnPostUpdateEvents = new SortedDictionary<int, List<(Guid eventId, Action action)>>();
 
         private const float LeftLowerArmAngle = -30f;
         private const float RightLowerArmAngle = -30f;
@@ -57,6 +58,7 @@ namespace VMC
         {
             instance = this;
             context = System.Threading.SynchronizationContext.Current;
+            StartCoroutine(AfterUpdateCoroutine());
         }
 
         private void Start()
@@ -97,16 +99,8 @@ namespace VMC
         }
         private void OnModelUnloading(GameObject model)
         {
-
-            if (virtualAvatar != null)
-            {
-                var currentVRIKTimingManager = virtualAvatar.GetComponent<VRIKTimingManager>();
-                if (currentVRIKTimingManager != null) Destroy(currentVRIKTimingManager);
-                var rootController = virtualAvatar.GetComponent<VRIKRootController>();
-                if (rootController != null) Destroy(rootController);
-                var currentvrik = virtualAvatar.GetComponent<VRIK>();
-                if (currentvrik != null) Destroy(currentvrik);
-            }
+            FinalIKCalibrator.ClearGeneratedGameObjects();
+            RemoveComponents();
         }
 
         private void Server_Received(object sender, DataReceivedEventArgs e)
@@ -214,7 +208,11 @@ namespace VMC
                 var rootController = virtualAvatar.GetComponent<VRIKRootController>();
                 if (rootController != null) DestroyImmediate(rootController);
                 var currentvrik = virtualAvatar.GetComponent<VRIK>();
-                if (currentvrik != null) DestroyImmediate(currentvrik);
+                if (currentvrik != null)
+                {
+                    currentvrik.solver.OnPostUpdate -= OnPostUpdate;
+                    DestroyImmediate(currentvrik);
+                }
             }
         }
 
@@ -422,6 +420,8 @@ namespace VMC
             vrik.solver.rightArm.stretchCurve = new AnimationCurve();
             vrik.UpdateSolverExternal();
 
+            vrik.solver.OnPostUpdate += OnPostUpdate;
+
             //膝のボーンの曲がる方向で膝の向きが決まってしまうため、強制的に膝のボーンを少し前に曲げる
             //if (animator != null)
             //{
@@ -486,6 +486,7 @@ namespace VMC
                 RightElbow = Tuple.Create(deviceDictionary[Settings.Current.RightElbow.Item1], Settings.Current.RightElbow.Item2),
                 LeftKnee = Tuple.Create(deviceDictionary[Settings.Current.LeftKnee.Item1], Settings.Current.LeftKnee.Item2),
                 RightKnee = Tuple.Create(deviceDictionary[Settings.Current.RightKnee.Item1], Settings.Current.RightKnee.Item2),
+                Chest = Tuple.Create(deviceDictionary[Settings.Current.Chest.Item1], Settings.Current.Chest.Item2),
             };
         }
 
@@ -510,12 +511,13 @@ namespace VMC
             Settings.Current.RightElbow = Tuple.Create(deviceDictionary[data.RightElbow.Item1], data.RightElbow.Item2);
             Settings.Current.LeftKnee = Tuple.Create(deviceDictionary[data.LeftKnee.Item1], data.LeftKnee.Item2);
             Settings.Current.RightKnee = Tuple.Create(deviceDictionary[data.RightKnee.Item1], data.RightKnee.Item2);
+            Settings.Current.Chest = Tuple.Create(deviceDictionary[data.Chest.Item1], data.Chest.Item2);
             SetVRIKTargetTrackers();
         }
 
         private enum TargetType
         {
-            Head, Pelvis, LeftArm, RightArm, LeftLeg, RightLeg, LeftElbow, RightElbow, LeftKnee, RightKnee
+            Head, Pelvis, LeftArm, RightArm, LeftLeg, RightLeg, LeftElbow, RightElbow, LeftKnee, RightKnee, Chest
         }
 
         private TrackingPoint GetTrackerTransformBySerialNumber(Tuple<ETrackedDeviceClass, string> serial, TargetType setTo, Transform headTracker = null)
@@ -581,6 +583,7 @@ namespace VMC
                 if (Settings.Current.RightElbow.Item1 == ETrackedDeviceClass.GenericTracker) trackerIds.Add(Settings.Current.RightElbow.Item2);
                 if (Settings.Current.LeftKnee.Item1 == ETrackedDeviceClass.GenericTracker) trackerIds.Add(Settings.Current.LeftKnee.Item2);
                 if (Settings.Current.RightKnee.Item1 == ETrackedDeviceClass.GenericTracker) trackerIds.Add(Settings.Current.RightKnee.Item2);
+                if (Settings.Current.Chest.Item1 == ETrackedDeviceClass.GenericTracker) trackerIds.Add(Settings.Current.Chest.Item2);
 
                 //ここに来るときは腰か足のトラッカー自動認識になってるとき
                 //割り当てられていないトラッカーリスト
@@ -728,8 +731,9 @@ namespace VMC
             var rightElbowTracker = GetTrackerTransformBySerialNumber(Settings.Current.RightElbow, TargetType.RightElbow, headTracker?.TargetTransform);
             var leftKneeTracker = GetTrackerTransformBySerialNumber(Settings.Current.LeftKnee, TargetType.LeftKnee, headTracker?.TargetTransform);
             var rightKneeTracker = GetTrackerTransformBySerialNumber(Settings.Current.RightKnee, TargetType.RightKnee, headTracker?.TargetTransform);
+            var chestTracker = GetTrackerTransformBySerialNumber(Settings.Current.Chest, TargetType.Chest, headTracker?.TargetTransform);
 
-            ClearChildren(headTracker, leftHandTracker, rightHandTracker, bodyTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker);
+            ClearChildren(headTracker, leftHandTracker, rightHandTracker, bodyTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker, chestTracker);
 
             var settings = new RootMotion.FinalIK.VRIKCalibrator.Settings();
 
@@ -779,6 +783,7 @@ namespace VMC
                 RightElbow = new TrackerPosition(rightElbowTracker),
                 LeftKnee = new TrackerPosition(leftKneeTracker),
                 RightKnee = new TrackerPosition(rightKneeTracker),
+                Chest = new TrackerPosition(chestTracker),
             };
 
             try
@@ -791,17 +796,28 @@ namespace VMC
             }
             catch { }
 
+            if (bodyTracker == null && chestTracker != null)
+            {
+                Debug.LogWarning("*No waist tracker. Reassign chest tracker to waist.");
+                bodyTracker = chestTracker;
+                chestTracker = null;
+            }
+
             if (calibrateType == PipeCommands.CalibrateType.Ipose || calibrateType == PipeCommands.CalibrateType.Tpose)
             {
-                yield return FinalIKCalibrator.Calibrate(calibrateType == PipeCommands.CalibrateType.Ipose ? FinalIKCalibrator.CalibrateMode.Ipose : FinalIKCalibrator.CalibrateMode.Tpose, HandTrackerRoot, PelvisTrackerRoot, vrik, settings, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker, generatedObject);
+                yield return FinalIKCalibrator.Calibrate(calibrateType == PipeCommands.CalibrateType.Ipose ? FinalIKCalibrator.CalibrateMode.Ipose : FinalIKCalibrator.CalibrateMode.Tpose, HandTrackerRoot, PelvisTrackerRoot, vrik, settings, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker, chestTracker, generatedObject);
             }
             else if (calibrateType == PipeCommands.CalibrateType.FixedHand)
             {
-                yield return Calibrator.CalibrateFixedHand(HandTrackerRoot, PelvisTrackerRoot, vrik, settings, leftHandOffset, rightHandOffset, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker);
+                yield return Calibrator.CalibrateFixedHand(HandTrackerRoot, PelvisTrackerRoot, vrik, settings, leftHandOffset, rightHandOffset, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker, chestTracker);
             }
             else if (calibrateType == PipeCommands.CalibrateType.FixedHandWithGround)
             {
-                yield return Calibrator.CalibrateFixedHandWithGround(HandTrackerRoot, PelvisTrackerRoot, vrik, settings, leftHandOffset, rightHandOffset, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker);
+                yield return Calibrator.CalibrateFixedHandWithGround(HandTrackerRoot, PelvisTrackerRoot, vrik, settings, leftHandOffset, rightHandOffset, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker, chestTracker);
+            }
+            else if (calibrateType == PipeCommands.CalibrateType.Default)
+            {
+                yield return Calibrator.CalibrateScaled(HandTrackerRoot, PelvisTrackerRoot, vrik, settings, leftHandOffset, rightHandOffset, headTracker, bodyTracker, leftHandTracker, rightHandTracker, leftFootTracker, rightFootTracker, leftElbowTracker, rightElbowTracker, leftKneeTracker, rightKneeTracker, chestTracker);
             }
 
             vrik.solver.IKPositionWeight = 1.0f;
@@ -832,6 +848,7 @@ namespace VMC
             Settings.Current.rightElbowTracker = StoreTransform.Create(rightElbowTracker?.TargetTransform);
             Settings.Current.leftKneeTracker = StoreTransform.Create(leftKneeTracker?.TargetTransform);
             Settings.Current.rightKneeTracker = StoreTransform.Create(rightKneeTracker?.TargetTransform);
+            Settings.Current.chestTracker = StoreTransform.Create(chestTracker?.TargetTransform);
 
             var calibratedLeftHandTransform = leftHandTracker?.TargetTransform?.OfType<Transform>().FirstOrDefault();
             var calibratedRightHandTransform = rightHandTracker?.TargetTransform?.OfType<Transform>().FirstOrDefault();
@@ -869,7 +886,7 @@ namespace VMC
             if (CalibrationResult.Type == PipeCommands.CalibrateType.Invalid)
             {
                 CalibrationState = CalibrationState.Uncalibrated; //キャリブレーションタイプがInvalidになっているときはキャリブレーション失敗
-            } 
+            }
             else
             {
                 CalibrationState = CalibrationState.Calibrating; //キャリブレーション状態を"キャリブレーション中"に設定
@@ -963,6 +980,56 @@ namespace VMC
         }
 
         #endregion
+
+        public Guid AddOnPostUpdate(int priority, Action action)
+        {
+            if (OnPostUpdateEvents.ContainsKey(priority) == false) OnPostUpdateEvents.Add(priority, new List<(Guid eventId, Action action)>());
+            var eventId = Guid.NewGuid();
+            OnPostUpdateEvents[priority].Add((eventId, action));
+            return eventId;
+        }
+
+        public void RemoveOnPostUpdate(Guid eventId)
+        {
+            foreach(var list in OnPostUpdateEvents.Values)
+            {
+                foreach(var value in list)
+                {
+                    if (value.eventId == eventId)
+                    {
+                        list.Remove(value);
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void OnPostUpdate()
+        {
+            foreach (var list in OnPostUpdateEvents.Values)
+            {
+                foreach (var value in list)
+                {
+                    if (value.action != null)
+                    {
+                        value.action.Invoke();
+                    }
+                }
+            }
+        }
+
+        private IEnumerator AfterUpdateCoroutine()
+        {
+            while (true)
+            {
+                yield return null;
+                // run after Update()
+
+                if (vrik != null) continue;
+                //VRIKが無い時に他のモーションソースを動かすために手動で実行する
+                OnPostUpdate();
+            }
+        }
 
     }
     public enum CalibrationState
